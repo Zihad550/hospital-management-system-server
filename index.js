@@ -70,6 +70,12 @@ async function run() {
       res.json(result);
     });
 
+    // get all users
+    app.get("/allUser", async (req, res) => {
+      const result = await usersCollection.find({}).toArray();
+      res.json(result);
+    });
+
     // delete user
     app.delete("/users", async (req, res) => {
       const { personId, role } = req.query;
