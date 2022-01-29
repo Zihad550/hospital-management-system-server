@@ -27,32 +27,100 @@ async function run() {
     const usersCollection = database.collection("users");
     const patientsCollection = database.collection("patients");
 
-    // add doctors, staffs
+    // add doctors, staffs, admins
     app.post("/users", async (req, res) => {
       const pic = req.files.image;
-      if (pic.size > 200000) {
-        res.json({ error: "Please select a file less then 200kb" });
+      const find = await usersCollection.findOne({
+        personId: req.body.personId,
+      });
+      if (find) {
+        res.json({ error: "Person exists with the id. Please give a new id" });
       } else {
-        const picData = pic.data;
-        const encodedPic = picData.toString("base64");
-        const imageBuffer = Buffer.from(encodedPic, "base64");
-        const user = {
-          ...req.body,
-          image: imageBuffer,
-        };
-        const result = await usersCollection.insertOne(user);
-        res.json(result);
+        if (pic.size > 200000) {
+          res.json({ error: "Please select a file less then 200kb" });
+        } else {
+          const picData = pic.data;
+          const encodedPic = picData.toString("base64");
+          const imageBuffer = Buffer.from(encodedPic, "base64");
+          const user = {
+            ...req.body,
+            image: imageBuffer,
+          };
+          const result = await usersCollection.insertOne(user);
+          res.json(result);
+        }
       }
+    });
+    // get users based on their role
+    app.get("/users", async (req, res) => {
+      const result = await usersCollection
+        .find({ role: req.query.role })
+        .toArray();
+      res.json(result);
     });
 
     // get user based on their role and id
-    app.get("/users", async (req, res) => {
+    app.get("/users/user", async (req, res) => {
       const { id, role } = req.query;
       console.log(id, role);
-      const result = await usersCollection
-        .find({ $and: [{ personId: id }, { role }] })
-        .toArray();
+      const result = await usersCollection.findOne({
+        $and: [{ personId: id }, { role }],
+      });
+
       res.json(result);
+    });
+
+    // delete user
+    app.delete("/users", async (req, res) => {
+      const { personId, role } = req.query;
+      const result = await usersCollection.deleteOne({
+        $and: [{ personId }, { role }],
+      });
+      res.json(result);
+    });
+
+    // update users
+    app.put("/users", async (req, res) => {
+      const pic = req?.files?.image;
+      const find = await usersCollection.findOne({
+        personId: req.body.personId,
+      });
+      if (find) {
+        res.json({ error: "Person exists with the id. Please give a new id" });
+      } else {
+        if (pic) {
+          if (pic.size > 200000) {
+            res.json({ error: "Please select a file less then 200kb" });
+          } else {
+            const picData = pic.data;
+            const { email, personId, role, name } = req.body;
+            const encodedPic = picData.toString("base64");
+            const imageBuffer = Buffer.from(encodedPic, "base64");
+            const newUser = {
+              email,
+              personId,
+              role,
+              name,
+              image: imageBuffer,
+            };
+            const result = await usersCollection.updateOne(
+              { _id: ObjectId(req.query.id) },
+              {
+                $set: { ...newUser },
+              }
+            );
+            res.json(result);
+          }
+        } else {
+          const result = await usersCollection.updateOne(
+            { _id: ObjectId(req.query.id) },
+            {
+              $set: { ...req.body },
+            }
+          );
+          res.json(result);
+        }
+      }
     });
 
     // add patient
@@ -85,19 +153,6 @@ async function run() {
     //get patients
     app.get("/patients", async (req, res) => {
       const result = await patientsCollection.find({}).toArray();
-      res.json(result);
-    });
-
-    app.put("/users", async (req, res) => {
-      const user = req.body;
-      const filter = { email: user.email };
-      const options = { upsert: true };
-      const updateDoc = { $set: user };
-      const result = await usersCollection.updateOne(
-        filter,
-        updateDoc,
-        options
-      );
       res.json(result);
     });
   } finally {
